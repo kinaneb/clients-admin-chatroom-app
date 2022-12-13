@@ -10,9 +10,7 @@ const io = new Server(server, {
   },
 });
 
-let vehiculeInfo = {};
-
-const users = [];
+let users = [];
 
 // Fake data
 const contact = {
@@ -20,20 +18,22 @@ const contact = {
   contactNumber: "0160293759",
 };
 
+const appointmentDuration = 2;
 const maintenanceAppointments = [
-  {
-    id: 1,
-    date: new Date("December 13, 2022 15:00:00"),
-  },
+  // {
+  //   id: 1,
+  //   date: new Date("December 13, 2022 15:00:00"),
+  // },
   {
     id: 2,
     date: new Date("December 15, 2022 10:00:00"),
   },
-  {
-    id: 3,
-    date: new Date("December 16, 2022 13:00:00"),
-  },
+  // {
+  //   id: 3,
+  //   date: new Date("December 16, 2022 13:00:00"),
+  // },
 ];
+// End Fake data
 
 const startChatBot = (socket) => {
   socket.emit("ask_help_type", {
@@ -46,6 +46,12 @@ Ou cliquez sur le bouton 'Arreter' pour arreter de discuter`,
   });
 };
 
+function addDays(date, days) {
+  var result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
 const sendMessage = (socket, emitType, value) => {
   socket.emit(emitType, value);
 };
@@ -57,23 +63,8 @@ app.get("/", (req, res) => {
 io.on("connection", (socket) => {
   console.log("Anonymous client connected");
 
-  // socket.on("send_nickname", (nickname) => {
-  //   console.log(nickname);
-  //   socket.nickname = nickname;
-  //   users.push({
-  //     nickname,
-  //   });
-  //   socket.emit("welcome_message", {
-  //     from: "server",
-  //     txt: `You have been connected to the server with nickname : ${socket.nickname}`,
-  //   });
-  //   console.log("Emit welcome_message");
-  //   socket.broadcast.emit("new_user_connection", {
-  //     from: "server",
-  //     txt: `${socket.nickname} has been connected to server`,
-  //   });
-  //   console.log("Emit new_user_connection");
-  // });
+  let vehiculeInfo = {};
+  let availableMaintenanceDates = [];
 
   socket.on("disconnect", () => {
     console.log("user disconnected");
@@ -88,16 +79,11 @@ io.on("connection", (socket) => {
 
   socket.on("send_help_type", (res) => {
     if (res === 1) {
-      // socket.emit("ask_vehicule_year", {
-      //   from: "server",
-      //   txt: "Saisir l'année d'i mmatriculation",
-      // });
       sendMessage(socket, "ask_vehicule_year", {
         from: "server",
         txt: "Saisir l'année d'immatriculation",
       });
     } else if (res === 2) {
-      console.log("bla");
       sendMessage(socket, "ask_usage_type", {
         from: "server",
         txt: `Type d'usage ?
@@ -120,11 +106,6 @@ io.on("connection", (socket) => {
       ...vehiculeInfo,
       vehiculeYear: res,
     };
-    // socket.emit("ask_last_maintenance_date", {
-    //   from: "server",
-    //   txt: "Saisir la date du dernier entretien",
-    //   vehiculeInfo,
-    // });
     sendMessage(socket, "ask_last_maintenance_date", {
       from: "server",
       txt: "Saisir la date du dernier entretien",
@@ -141,20 +122,33 @@ io.on("connection", (socket) => {
       new Date(vehiculeInfo.lastMaintenanceDate).getFullYear() -
         new Date().getFullYear()
     );
-    console.log(yearDiff);
     if (yearDiff > 1) {
       // TODO  choix date de rdv avec calendrier
+      // const today = new Date("2022-12-16");
+      const today = new Date();
+      const currentDay = today.getDay();
+      for (let day = today.getDay(); day < 6; day++) {
+        if (!maintenanceAppointments.some((e) => e.date.getFullYear() === day)) {
+          if (day > 0 && day < 6) {
+            availableMaintenanceDates.push(addDays(today, day - currentDay));
+          }
+        }
+      }
+      if (availableMaintenanceDates.length) {
+        console.log(availableMaintenanceDates);
+        console.log(availableMaintenanceDates[0].getFullYear());
+        sendMessage(socket, "ask_appointment_date", {
+          from: "server",
+          txt: availableMaintenanceDates,
+        });
+      }
+      // sendMessage(socket, "send_available_appoinments", availableDates)
     } else {
       sendMessage(socket, "ask_km_since_last_maintenance", {
         from: "server",
         txt: "Saisir le nombre de kilomètres parcourus depuis le dernier entretien",
         vehiculeInfo,
       });
-      // socket.emit("ask_km_since_last_maintenance", {
-      //   from: "server",
-      //   txt: "Saisir le nombre de kilomètres parcourus depuis le dernier entretien",
-      //   vehiculeInfo,
-      // });
     }
   });
 
@@ -175,13 +169,6 @@ io.on("connection", (socket) => {
 2 : Non`,
         vehiculeInfo,
       });
-      //       socket.emit("ask_do_revision", {
-      //         from: "server",
-      //         txt: `Souhaitez-vous effectuer une révision ?
-      // 1 : Oui
-      // 2 : Non`,
-      //         vehiculeInfo,
-      //       });
     }
   });
 
@@ -194,14 +181,6 @@ io.on("connection", (socket) => {
       socket.emit("reset_chat");
     }
   });
-
-  // socket.on("chat_message", (msg) => {
-  //   console.log(`${socket.nickname} : ${msg}`);
-  //   io.emit("chat_message", {
-  //     from: socket.nickname,
-  //     txt: msg,
-  //   });
-  // });
 
   socket.on("send_usage_type", (res) => {
     console.log(res);
