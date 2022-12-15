@@ -18,7 +18,7 @@ const contact = {
   contactNumber: "0160293759",
 };
 
-const appointmentDuration = 2;
+let nextMaintenanceId = 4;
 const maintenanceAppointments = [
   // {
   //   id: 1,
@@ -65,6 +65,29 @@ io.on("connection", (socket) => {
 
   let vehiculeInfo = {};
   let availableMaintenanceDates = [];
+
+  const calcAvailableMaintenanceDates = () => {
+    let nextAvailableMaintenanceId = 1;
+    let today = new Date("2022-12-13");
+    // let today = new Date();
+    const currentDay = today.getDay();
+    availableMaintenanceDates = [];
+    for (let day = today.getDay(); day < 6; day++) {
+      if (
+        !maintenanceAppointments.some(
+          (e) => e.date.getDate() === addDays(today, day - currentDay).getDate()
+        )
+      ) {
+        if (day > 0 && day < 6) {
+          availableMaintenanceDates.push({
+            id: nextAvailableMaintenanceId,
+            date: addDays(today, day - currentDay),
+          });
+          nextAvailableMaintenanceId += 1;
+        }
+      }
+    }
+  };
 
   socket.on("disconnect", () => {
     console.log("user disconnected");
@@ -125,24 +148,28 @@ io.on("connection", (socket) => {
     if (yearDiff > 1) {
       // TODO  choix date de rdv avec calendrier
       // const today = new Date("2022-12-16");
-      const today = new Date();
-      const currentDay = today.getDay();
-      for (let day = today.getDay(); day < 6; day++) {
-        if (!maintenanceAppointments.some((e) => e.date.getFullYear() === day)) {
-          if (day > 0 && day < 6) {
-            availableMaintenanceDates.push(addDays(today, day - currentDay));
-          }
-        }
-      }
+      // let today = new Date();
+      // const currentDay = today.getDay();
+      // for (let day = today.getDay(); day < 6; day++) {
+      //   if (
+      //     !maintenanceAppointments.some(
+      //       (e) =>
+      //         e.date.getDate() === addDays(today, day - currentDay).getDate()
+      //     )
+      //   ) {
+      //     if (day > 0 && day < 6) {
+      //       availableMaintenanceDates.push(addDays(today, day - currentDay));
+      //     }
+      //   }
+      // }
+      calcAvailableMaintenanceDates();
       if (availableMaintenanceDates.length) {
-        console.log(availableMaintenanceDates);
-        console.log(availableMaintenanceDates[0].getFullYear());
         sendMessage(socket, "ask_appointment_date", {
           from: "server",
           txt: availableMaintenanceDates,
         });
+        console.log(availableMaintenanceDates);
       }
-      // sendMessage(socket, "send_available_appoinments", availableDates)
     } else {
       sendMessage(socket, "ask_km_since_last_maintenance", {
         from: "server",
@@ -152,14 +179,41 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("send_appointment_date", (res) => {
+    console.log("before push");
+    console.log("res : " + res);
+    console.log(availableMaintenanceDates);
+    console.log(maintenanceAppointments);
+    console.log(availableMaintenanceDates.find((e) => e.id === res));
+    if (availableMaintenanceDates.some((e) => e.id === res)) {
+      maintenanceAppointments.push({
+        id: nextMaintenanceId,
+        date: availableMaintenanceDates.find((e) => e.id === res),
+      });
+      nextMaintenanceId += 1;
+      console.log("after push");
+      console.log(availableMaintenanceDates);
+      console.log(maintenanceAppointments);
+    }
+    //   sendMessage(socket, "appointment_already_taken", {
+    //     from: "server",
+    //     txt: "Le rendez-vous n'est plus disponible, veillez choisir une autre date",
+    //   });
+    // } else {
+    // }
+    // if (res === 1) {
+    //   // TODO demande rdv
+    // } else {
+    //   socket.emit("reset_chat");
+    // }
+  });
+
   socket.on("send_km_since_maintenance_date", (res) => {
-    console.log(res);
     vehiculeInfo = {
       ...vehiculeInfo,
       kmSinceLastMaintenance: res,
     };
     if (vehiculeInfo.kmSinceLastMaintenance >= 10000) {
-      console.log("TOOO : demande rdv");
       // TODO rdv
     } else {
       sendMessage(socket, "ask_do_revision", {
@@ -173,9 +227,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send_do_revision", (res) => {
-    console.log(res);
     if (res === 1) {
-      console.log("TODO : demande rdv");
       // TODO demande rdv
     } else {
       socket.emit("reset_chat");
@@ -183,7 +235,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send_usage_type", (res) => {
-    console.log(res);
     if (res === 1) {
       // TODO demande rdv routier
       socket.emit("reset_chat");
@@ -197,7 +248,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send_contact_type", (res) => {
-    console.log(maintenanceAppointments);
     if (res === 1) {
       sendMessage(socket, "send_contact_email", {
         from: "server",
