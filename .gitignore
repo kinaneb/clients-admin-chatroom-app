@@ -3,6 +3,7 @@ node_modules/
 fron-web-real/node_modules/
 .npm
 .idea
+/node_modules
 .env
 .ash_history
 .node_repl_history
