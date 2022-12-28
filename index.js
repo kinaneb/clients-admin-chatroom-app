@@ -342,7 +342,6 @@ io.on("connection", (socket) => {
       }
     }
     if (availableMaintenanceDates.length === 0) {
-      console.log("ici");
       today = getNextMonday();
       let currentDay = today.getDay();
       availableMaintenanceDates = [];
@@ -363,7 +362,6 @@ io.on("connection", (socket) => {
         }
       }
     }
-    console.log(availableMaintenanceDates);
   };
 
   // const calcAvailableMaintenanceDatesNextWeek = () => {
@@ -428,9 +426,6 @@ io.on("connection", (socket) => {
     );
     if (yearDiff > 1) {
       calcAvailableMaintenanceDates();
-      // if (availableMaintenanceDates.length === 0) {
-      //   calcAvailableMaintenanceDatesNextWeek();
-      // }
       sendMessage(socket, "ask_appointment_date", {
         from: "server",
         txt: availableMaintenanceDates,
@@ -467,13 +462,12 @@ io.on("connection", (socket) => {
     };
     if (vehiculeInfo.kmSinceLastMaintenance >= 10000) {
       // TODO rdv
-      // calcAvailableMaintenanceDates();
-      // if (availableMaintenanceDates.length) {
-      //   sendMessage(socket, "ask_appointment_date", {
-      //     from: "server",
-      //     txt: availableMaintenanceDates,
-      //     vehiculeInfo,
-      //   });
+      calcAvailableMaintenanceDates();
+      sendMessage(socket, "ask_appointment_date", {
+        from: "server",
+        txt: availableMaintenanceDates,
+        vehiculeInfo,
+      });
       // }
     } else {
       sendMessage(socket, "ask_do_revision", {
