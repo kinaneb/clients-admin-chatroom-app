@@ -1,6 +1,6 @@
 .DS_Store
-node_modules
-fron-web-real/node_modules
+node_modules/
+fron-web-real/node_modules/
 .npm
 .idea
 .env
