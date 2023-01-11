@@ -1,22 +1,18 @@
 .DS_Store
-node_modules/
-fron-web-real/node_modules/
+node_modules
+fron-web-real/node_modules
 .npm
 .idea
-/node_modules
-front/fron-web-real/node_modules/
-front/node_modules/
-node_modules/
-/.npm
-/.idea
 .env
 .ash_history
 .node_repl_history
 /dist
 
-# init project files
-package-lock.json
-package.json
+## init project files
+#package-lock.json
+#package.json
+#!fron-web-real/package-lock.json
+#!fron-web-real/package.json
 
 
 # local env files
@@ -37,5 +33,3 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
-
-.DS_Store
