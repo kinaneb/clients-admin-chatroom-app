@@ -8,6 +8,8 @@ const cors = require('cors');
 
 // const coolieParser = require('cookie-parser');
 const path = require('path');
+// const formatMessage = require('./utils/messages')
+// const {userJoin, getCurrentUser, userLeave, getRoomUsers} = require('./utils/users');
 
 // middlewares
 const jwtSocketHandler = require('./middleware/jwtSocketHandler');
@@ -37,6 +39,15 @@ const {
   getOnlineUsers,
   addToWaitingList,
   getWaitingList,
+  leaveWaitingList,
+  isConsultant,
+} = require("./utils/users");
+const formatMessage = require("./utils/messages");
+const {
+  saveNewMaintenanceAppointment,
+  getAllMaintenanceAppointments,
+  getLastMaintenanceAppointmentId,
+} = require("./controllers/maintenanceAppointmentsController");
   leaveWaitingList, isConsultant, consultantNotAvailable
 } = require('./utils/users');
 const formatMessage = require('./utils/messages');
@@ -80,7 +91,6 @@ io.use(jwtSocketHandler);
 
 // aux function and fake data Chat Bot
 
-
 // let users = [];
 
 // Fake data
@@ -89,21 +99,25 @@ const contact = {
   contactNumber: "0160293759",
 };
 
-let nextMaintenanceId = 4;
-const maintenanceAppointments = [
-  // {
-  //   id: 1,
-  //   date: new Date("December 13, 2022 15:00:00"),
-  // },
-  {
-    id: 2,
-    date: new Date("December 15, 2022 10:00:00"),
-  },
-  // {
-  //   id: 3,
-  //   date: new Date("December 16, 2022 13:00:00"),
-  // },
-];
+// let nextMaintenanceId = 4;
+// const maintenanceAppointments = [
+//   // {
+//   //   id: 1,
+//   //   date: new Date("December 13, 2022 15:00:00"),
+//   // },
+//   {
+//     id: 2,
+//     date: new Date("December 15, 2022 10:00:00"),
+//   },
+//   // {
+//   //   id: 3,
+//   //   date: new Date("December 16, 2022 13:00:00"),
+//   // },
+// ];
+const maintenanceAppointments = getAllMaintenanceAppointments();
+let nextMaintenanceId = getLastMaintenanceAppointmentId();
+
+console.log(maintenanceAppointments);
 
 let nextRevisionId = 3;
 const revisionAppointments = [
@@ -137,7 +151,6 @@ const roadAppointments = [
   },
 ];
 
-
 let nextOffroadAppointmentId = 4;
 const offroadAppointments = [
   // {
@@ -153,7 +166,6 @@ const offroadAppointments = [
     date: new Date("December 29, 2022 13:00:00"),
   },
 ];
-
 
 let nextSportAppointmentId = 4;
 const sportAppointments = [
@@ -192,9 +204,9 @@ function addDays(date, days) {
 function getNextMonday(date = new Date()) {
   const dateCopy = new Date(date.getTime());
   const nextMonday = new Date(
-      dateCopy.setDate(
-          dateCopy.getDate() + ((7 - dateCopy.getDay() + 1) % 7 || 7)
-      )
+    dateCopy.setDate(
+      dateCopy.getDate() + ((7 - dateCopy.getDay() + 1) % 7 || 7)
+    )
   );
 
   return nextMonday;
@@ -210,8 +222,8 @@ io.on('connection', (socket) => {
   // console.log("on connection", socket.handshake.auth);
   const user = userJoin(socket.id, socket.handshake.auth.username, socket.handshake.auth.roles, PublicRoom);
   socket.join(user.room);
-  if(user.isAvailable){
-    io.emit('availableConsultants', getConsultants());
+  if (user.isAvailable) {
+    io.emit("availableConsultants", getConsultants());
   }
   socket.emit( 'roles', user.roles);
 
@@ -225,7 +237,7 @@ io.on('connection', (socket) => {
     io.to(id).emit('message', formatMessage(user.username, 'askToChat'));
     addToWaitingList(id, user);
     io.to(id).emit("waitingList", getWaitingList(id));
-    const room = `${id}${user.id}`
+    const room = `${id}${user.id}`;
     socket.leave(user.room);
     user.room = room;
     socket.join(room);
@@ -233,7 +245,7 @@ io.on('connection', (socket) => {
 
   socket.on('acceptToChat', (id) => {
     leaveWaitingList(id, user);
-    const room = `${user.id}${id}`
+    const room = `${user.id}${id}`;
     socket.leave(user.room);
     user.room = room;
     user.isAvailable = false;
@@ -241,16 +253,6 @@ io.on('connection', (socket) => {
     io.emit('availableConsultants', getConsultants());
     socket.join(user.room);
     socket.to(room).emit('message', formatMessage(BotName, `${user.username} has accept your request`));
-  });
-
-  socket.on('refuseToChat', (id) => {
-    const client = getCurrentUser(id);
-    leaveWaitingList(id, user);
-    socket.emit("waitingList", getWaitingList(id))
-    io.to(id).socketsLeave(client.room);
-    client.room = "Public Room";
-    io.to(id).socketsJoin(client.room);
-    socket.to(client.id).emit('consultantRefuseToChat', formatMessage(BotName, `${user.username} has refuse your request`));
   });
 
   socket.on('leaveChat', () => {
@@ -269,10 +271,10 @@ io.on('connection', (socket) => {
     io.to(id).emit("waitingList", getWaitingList(id))
   });
 
-  // send users and room info
-  io.to(user.room).emit('roomUsers', {
-    users: getRoomUsers(user.room)
-  });
+    // send users and room info
+    io.to(user.room).emit('roomUsers', {
+      users: getRoomUsers(user.room)
+    });
 
   // listen for chatMessage
   socket.on('chatMessage', (message) => {
@@ -345,9 +347,10 @@ io.on('connection', (socket) => {
       availableMaintenanceDates = [];
       for (let day = today.getDay(); day < 6; day++) {
         if (
-            !maintenanceAppointments.some(
-                (e) => e.date.getDate() === addDays(today, day - currentDay).getDate()
-            )
+          !maintenanceAppointments.some(
+            (e) =>
+              e.date.getDate() === addDays(today, day - currentDay).getDate()
+          )
         ) {
           if (day > 0 && day < 6) {
             availableMaintenanceDates.push({
@@ -364,10 +367,10 @@ io.on('connection', (socket) => {
         availableMaintenanceDates = [];
         for (let day = today.getDay(); day < 6; day++) {
           if (
-              !maintenanceAppointments.some(
-                  (e) =>
-                      e.date.getDate() === addDays(today, day - currentDay).getDate()
-              )
+            !maintenanceAppointments.some(
+              (e) =>
+                e.date.getDate() === addDays(today, day - currentDay).getDate()
+            )
           ) {
             if (day > 0 && day < 6) {
               availableMaintenanceDates.push({
@@ -389,9 +392,10 @@ io.on('connection', (socket) => {
       availableRevisionDates = [];
       for (let day = today.getDay(); day < 6; day++) {
         if (
-            !revisionAppointments.some(
-                (e) => e.date.getDate() === addDays(today, day - currentDay).getDate()
-            )
+          !revisionAppointments.some(
+            (e) =>
+              e.date.getDate() === addDays(today, day - currentDay).getDate()
+          )
         ) {
           if (day > 0 && day < 6) {
             availableRevisionDates.push({
@@ -408,10 +412,10 @@ io.on('connection', (socket) => {
         availableRevisionDates = [];
         for (let day = today.getDay(); day < 6; day++) {
           if (
-              !revisionAppointments.some(
-                  (e) =>
-                      e.date.getDate() === addDays(today, day - currentDay).getDate()
-              )
+            !revisionAppointments.some(
+              (e) =>
+                e.date.getDate() === addDays(today, day - currentDay).getDate()
+            )
           ) {
             if (day > 0 && day < 6) {
               availableRevisionDates.push({
@@ -433,9 +437,10 @@ io.on('connection', (socket) => {
       availableRoadDates = [];
       for (let day = today.getDay(); day < 6; day++) {
         if (
-            !roadAppointments.some(
-                (e) => e.date.getDate() === addDays(today, day - currentDay).getDate()
-            )
+          !roadAppointments.some(
+            (e) =>
+              e.date.getDate() === addDays(today, day - currentDay).getDate()
+          )
         ) {
           if (day > 0 && day < 6) {
             availableRoadDates.push({
@@ -452,10 +457,10 @@ io.on('connection', (socket) => {
         availableRoadDates = [];
         for (let day = today.getDay(); day < 6; day++) {
           if (
-              !roadAppointments.some(
-                  (e) =>
-                      e.date.getDate() === addDays(today, day - currentDay).getDate()
-              )
+            !roadAppointments.some(
+              (e) =>
+                e.date.getDate() === addDays(today, day - currentDay).getDate()
+            )
           ) {
             if (day > 0 && day < 6) {
               availableRoadDates.push({
@@ -477,9 +482,10 @@ io.on('connection', (socket) => {
       availableOffroadDates = [];
       for (let day = today.getDay(); day < 6; day++) {
         if (
-            !offroadAppointments.some(
-                (e) => e.date.getDate() === addDays(today, day - currentDay).getDate()
-            )
+          !offroadAppointments.some(
+            (e) =>
+              e.date.getDate() === addDays(today, day - currentDay).getDate()
+          )
         ) {
           if (day > 0 && day < 6) {
             availableOffroadDates.push({
@@ -496,10 +502,10 @@ io.on('connection', (socket) => {
         availableOffroadDates = [];
         for (let day = today.getDay(); day < 6; day++) {
           if (
-              !offroadAppointments.some(
-                  (e) =>
-                      e.date.getDate() === addDays(today, day - currentDay).getDate()
-              )
+            !offroadAppointments.some(
+              (e) =>
+                e.date.getDate() === addDays(today, day - currentDay).getDate()
+            )
           ) {
             if (day > 0 && day < 6) {
               availableOffroadDates.push({
@@ -521,9 +527,10 @@ io.on('connection', (socket) => {
       availableSportDates = [];
       for (let day = today.getDay(); day < 6; day++) {
         if (
-            !sportAppointments.some(
-                (e) => e.date.getDate() === addDays(today, day - currentDay).getDate()
-            )
+          !sportAppointments.some(
+            (e) =>
+              e.date.getDate() === addDays(today, day - currentDay).getDate()
+          )
         ) {
           if (day > 0 && day < 6) {
             availableSportDates.push({
@@ -540,10 +547,10 @@ io.on('connection', (socket) => {
         availableSportDates = [];
         for (let day = today.getDay(); day < 6; day++) {
           if (
-              !sportAppointments.some(
-                  (e) =>
-                      e.date.getDate() === addDays(today, day - currentDay).getDate()
-              )
+            !sportAppointments.some(
+              (e) =>
+                e.date.getDate() === addDays(today, day - currentDay).getDate()
+            )
           ) {
             if (day > 0 && day < 6) {
               availableSportDates.push({
@@ -610,7 +617,7 @@ io.on('connection', (socket) => {
         lastMaintenanceDate: res,
       };
       let yearDiff = Math.abs(
-          new Date(vehiculeInfo.lastMaintenanceDate).getFullYear() -
+        new Date(vehiculeInfo.lastMaintenanceDate).getFullYear() -
           new Date().getFullYear()
       );
       if (yearDiff > 1) {
@@ -631,10 +638,14 @@ io.on('connection', (socket) => {
 
     socket.on("send_maintenance_appointment_date", (res) => {
       if (availableMaintenanceDates.some((e) => e.id === res)) {
-        maintenanceAppointments.push({
-          id: nextMaintenanceId,
-          date: availableMaintenanceDates.find((e) => e.id === res).date,
-        });
+        // maintenanceAppointments.push({
+        //   id: nextMaintenanceId,
+        //   date: availableMaintenanceDates.find((e) => e.id === res).date,
+        // });
+        let res = saveNewMaintenanceAppointment(
+          nextMaintenanceId,
+          availableMaintenanceDates.find((e) => e.id === res).date
+        );
         nextMaintenanceId += 1;
         socket.emit("maintenance_appointment_added", {
           from: "server",
@@ -780,7 +791,6 @@ io.on('connection', (socket) => {
   });
 
   // end chat Bot
-
 });
 
 // ioChatbot.on('connection', (socket) => {})
@@ -795,10 +805,8 @@ io.on('connection', (socket) => {
 //   cookie: true
 // });
 
-
 // app.use(express.json());
 // app.use(coolieParser);
-
 
 // set static folder
 //
@@ -816,6 +824,3 @@ io.on('connection', (socket) => {
 //   console.log("Anonymous client connected");
 //
 // });
-
-
-
