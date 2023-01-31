@@ -12,6 +12,7 @@ const emit = defineEmits(['close-chat-bot']);
 function closeChatBot () {
   emit('close-chat-bot');
 }
+
 // eslint-disable-next-line vue/no-setup-props-destructure
 const socket = props.socket;
 const chatText = ref('')
